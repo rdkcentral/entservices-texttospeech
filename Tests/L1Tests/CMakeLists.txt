@@ -102,20 +102,20 @@ macro(add_plugin_test plugin_name test_files)
 endmacro()
 
 # PLUGIN_SCREENCAPTURE
-set (SCREENCAPTURE_INC ../../ScreenCapture ../../helpers)
+set (SCREENCAPTURE_INC ${CMAKE_SOURCE_DIR}/../entservices-mediaanddrm/ScreenCapture ${CMAKE_SOURCE_DIR}/../entservices-mediaanddrm/helpers)
 set (SCREENCAPTURE_LIBS ${NAMESPACE}ScreenCapture ${NAMESPACE}ScreenCaptureImplementation)
 add_plugin_test_ex(PLUGIN_SCREENCAPTURE tests/test_ScreenCapture.cpp "${SCREENCAPTURE_INC}" "${SCREENCAPTURE_LIBS}")
 
 # PLUGIN_PLAYERINFO
-set (PLAYERINFO_INC ../../PlayerInfo ../../helpers)
+set (PLAYERINFO_INC ${CMAKE_SOURCE_DIR}/../entservices-mediaanddrm/PlayerInfo ${CMAKE_SOURCE_DIR}/../entservices-mediaanddrm/helpers)
 add_plugin_test_ex(PLUGIN_PLAYERINFO tests/test_PlayerInfo.cpp "${PLAYERINFO_INC}" "${NAMESPACE}PlayerInfo")
 
 # PLUGIN_LINEARPLAYBACKCONTROL
-set (LINEARPLAYBACKCONTROL_INC ../../LinearPlaybackControl ../../helpers)
+set (LINEARPLAYBACKCONTROL_INC ${CMAKE_SOURCE_DIR}/../entservices-mediaanddrm/LinearPlaybackControl ${CMAKE_SOURCE_DIR}/../entservices-mediaanddrm/helpers)
 add_plugin_test_ex(PLUGIN_LINEARPLAYBACKCONTROL tests/test_LinearPlaybackControl.cpp "${LINEARPLAYBACKCONTROL_INC}" "${NAMESPACE}LinearPlaybackControl")
 
 # PLUGIN_UNIFIEDCASMANAGEMENT
-set (UNIFIEDCASMANAGEMENT_INC ../../UnifiedCASManagement ../../helpers)
+set (UNIFIEDCASMANAGEMENT_INC ${CMAKE_SOURCE_DIR}/../entservices-mediaanddrm/UnifiedCASManagement ${CMAKE_SOURCE_DIR}/../entservices-mediaanddrm/helpers)
 add_plugin_test_ex(PLUGIN_UNIFIEDCASMANAGEMENT tests/test_UnifiedCASManagement.cpp "${UNIFIEDCASMANAGEMENT_INC}" "${NAMESPACE}UnifiedCASManagement")
 
 # PLUGIN_SYSTEMAUDIOPLAYER
@@ -143,5 +143,3 @@ target_include_directories(${MODULE_NAME}
 
 install(TARGETS ${MODULE_NAME} DESTINATION lib)
 write_config(${PLUGIN_NAME})
-
-
