@@ -143,5 +143,3 @@ target_include_directories(${MODULE_NAME}
 
 install(TARGETS ${MODULE_NAME} DESTINATION lib)
 write_config(${PLUGIN_NAME})
-
-
