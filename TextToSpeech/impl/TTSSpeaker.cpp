@@ -18,6 +18,7 @@
  */
 
 #include "TTSSpeaker.h"
+#include <algorithm>
 #include "TTSURLConstructer.h"
 #include "NetworkStatusObserver.h"
 #include "SatToken.h"
@@ -871,6 +872,49 @@ std::string TTSSpeaker::constructURL(TTSConfiguration &config, SpeechData &d) {
 
 void TTSSpeaker::play(string url, SpeechData &data, bool authrequired, string token) {
     m_currentSpeech = &data;
+    
+    // Validate URL to prevent SSRF attacks
+    if (url.empty()) {
+        TTSLOG_ERROR("Invalid URL - empty URL not allowed");
+        return;
+    }
+    
+    // Reject localhost and internal network URLs to prevent SSRF
+    std::string lowerUrl = url;
+    std::transform(lowerUrl.begin(), lowerUrl.end(), lowerUrl.begin(), ::tolower);
+    
+    if (lowerUrl.find("127.0.0.1") != std::string::npos ||
+        lowerUrl.find("localhost") != std::string::npos ||
+        lowerUrl.find("::1") != std::string::npos ||
+        lowerUrl.find("0.0.0.0") != std::string::npos ||
+        lowerUrl.find("192.168.") != std::string::npos ||
+        lowerUrl.find("10.") != std::string::npos ||
+        lowerUrl.find("172.16.") != std::string::npos ||
+        lowerUrl.find("172.17.") != std::string::npos ||
+        lowerUrl.find("172.18.") != std::string::npos ||
+        lowerUrl.find("172.19.") != std::string::npos ||
+        lowerUrl.find("172.20.") != std::string::npos ||
+        lowerUrl.find("172.21.") != std::string::npos ||
+        lowerUrl.find("172.22.") != std::string::npos ||
+        lowerUrl.find("172.23.") != std::string::npos ||
+        lowerUrl.find("172.24.") != std::string::npos ||
+        lowerUrl.find("172.25.") != std::string::npos ||
+        lowerUrl.find("172.26.") != std::string::npos ||
+        lowerUrl.find("172.27.") != std::string::npos ||
+        lowerUrl.find("172.28.") != std::string::npos ||
+        lowerUrl.find("172.29.") != std::string::npos ||
+        lowerUrl.find("172.30.") != std::string::npos ||
+        lowerUrl.find("172.31.") != std::string::npos) {
+        TTSLOG_ERROR("Invalid URL - internal network URLs not allowed");
+        return;
+    }
+    
+    // Only allow HTTPS URLs for security
+    if (lowerUrl.find("https://") != 0 && lowerUrl.find("http://") != 0) {
+        TTSLOG_ERROR("Invalid URL - only http:// and https:// URLs allowed");
+        return;
+    }
+    
     g_object_set(G_OBJECT(m_source), "location", url.c_str(), NULL);
     if(authrequired)
     {
