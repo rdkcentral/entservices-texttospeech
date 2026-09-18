@@ -18,6 +18,7 @@
 **/
 
 #include "TTSURLConstructer.h"
+#include <algorithm>
 #include <curl/curl.h>
 #include <unistd.h>
 
@@ -57,8 +58,52 @@ std::string TTSURLConstructer::constructURL(TTSConfiguration &config, std::strin
 
 std::string TTSURLConstructer::httpgetURL(TTSConfiguration &config, std::string text, bool isfallback, bool isLocal) {
     // EndPoint URL
+    std::string endpoint = isLocal ? config.localEndPoint() : (config.isRFCEnabled() ? config.rfcEndPoint() : config.secureEndPoint());
+    
+    // Validate endpoint URL to prevent SSRF attacks
+    if (endpoint.empty()) {
+        TTSLOG_ERROR("Invalid endpoint - empty URL not allowed");
+        return "";
+    }
+    
+    // Reject localhost and internal network URLs to prevent SSRF
+    std::string lowerEndpoint = endpoint;
+    std::transform(lowerEndpoint.begin(), lowerEndpoint.end(), lowerEndpoint.begin(), ::tolower);
+    
+    if (lowerEndpoint.find("127.0.0.1") != std::string::npos ||
+        lowerEndpoint.find("localhost") != std::string::npos ||
+        lowerEndpoint.find("::1") != std::string::npos ||
+        lowerEndpoint.find("0.0.0.0") != std::string::npos ||
+        lowerEndpoint.find("192.168.") != std::string::npos ||
+        lowerEndpoint.find("10.") != std::string::npos ||
+        lowerEndpoint.find("172.16.") != std::string::npos ||
+        lowerEndpoint.find("172.17.") != std::string::npos ||
+        lowerEndpoint.find("172.18.") != std::string::npos ||
+        lowerEndpoint.find("172.19.") != std::string::npos ||
+        lowerEndpoint.find("172.20.") != std::string::npos ||
+        lowerEndpoint.find("172.21.") != std::string::npos ||
+        lowerEndpoint.find("172.22.") != std::string::npos ||
+        lowerEndpoint.find("172.23.") != std::string::npos ||
+        lowerEndpoint.find("172.24.") != std::string::npos ||
+        lowerEndpoint.find("172.25.") != std::string::npos ||
+        lowerEndpoint.find("172.26.") != std::string::npos ||
+        lowerEndpoint.find("172.27.") != std::string::npos ||
+        lowerEndpoint.find("172.28.") != std::string::npos ||
+        lowerEndpoint.find("172.29.") != std::string::npos ||
+        lowerEndpoint.find("172.30.") != std::string::npos ||
+        lowerEndpoint.find("172.31.") != std::string::npos) {
+        TTSLOG_ERROR("Invalid endpoint - internal network URLs not allowed");
+        return "";
+    }
+    
+    // Only allow HTTPS URLs for security
+    if (lowerEndpoint.find("https://") != 0 && lowerEndpoint.find("http://") != 0) {
+        TTSLOG_ERROR("Invalid endpoint - only http:// and https:// URLs allowed");
+        return "";
+    }
+    
     std::string ttsRequest;
-    ttsRequest.append(isLocal ? config.localEndPoint() : (config.isRFCEnabled() ? config.rfcEndPoint() : config.secureEndPoint()));
+    ttsRequest.append(endpoint);
 
     // Voice
     if(!config.voice().empty()) {
