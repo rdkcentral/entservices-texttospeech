@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <curl/curl.h>
 #include <unistd.h>
+#include <regex>
 
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -34,6 +35,37 @@ static const std::map<std::string, int> speechRateMap = {
     {"faster", 90},
     {"fastest", 100}
 };
+
+// Validate TTS endpoint URL to prevent SSRF (RDKEMW-24488)
+static bool isValidTTSEndpoint(const std::string& url)
+{
+    if (url.empty())
+        return false;
+
+    // Reject file:// protocol
+    if (url.find("file://") == 0)
+        return false;
+
+    // Reject loopback addresses
+    std::regex loopbackRegex(R"(https?://(127\.|0x7f\.\.\.|localhost|\[::1\]))", std::regex::icase);
+    if (std::regex_search(url, loopbackRegex))
+        return false;
+
+    // Reject private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+    std::regex privateRegex(R"(https?://(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.))", std::regex::icase);
+    if (std::regex_search(url, privateRegex))
+        return false;
+
+    // Accept HTTPS endpoints
+    if (url.find("https://") == 0)
+        return true;
+
+    // Reject HTTP endpoints (only HTTPS allowed for security)
+    if (url.find("http://") == 0)
+        return false;
+
+    return false;
+}
 
 namespace TTS
 {
@@ -59,46 +91,10 @@ std::string TTSURLConstructer::constructURL(TTSConfiguration &config, std::strin
 std::string TTSURLConstructer::httpgetURL(TTSConfiguration &config, std::string text, bool isfallback, bool isLocal) {
     // EndPoint URL
     std::string endpoint = isLocal ? config.localEndPoint() : (config.isRFCEnabled() ? config.rfcEndPoint() : config.secureEndPoint());
-    
-    // Validate endpoint URL to prevent SSRF attacks
-    if (endpoint.empty()) {
-        TTSLOG_ERROR("Invalid endpoint - empty URL not allowed");
-        return "";
-    }
-    
-    // Reject localhost and internal network URLs to prevent SSRF
-    std::string lowerEndpoint = endpoint;
-    std::transform(lowerEndpoint.begin(), lowerEndpoint.end(), lowerEndpoint.begin(), ::tolower);
-    
-    if (lowerEndpoint.find("127.0.0.1") != std::string::npos ||
-        lowerEndpoint.find("localhost") != std::string::npos ||
-        lowerEndpoint.find("::1") != std::string::npos ||
-        lowerEndpoint.find("0.0.0.0") != std::string::npos ||
-        lowerEndpoint.find("192.168.") != std::string::npos ||
-        lowerEndpoint.find("10.") != std::string::npos ||
-        lowerEndpoint.find("172.16.") != std::string::npos ||
-        lowerEndpoint.find("172.17.") != std::string::npos ||
-        lowerEndpoint.find("172.18.") != std::string::npos ||
-        lowerEndpoint.find("172.19.") != std::string::npos ||
-        lowerEndpoint.find("172.20.") != std::string::npos ||
-        lowerEndpoint.find("172.21.") != std::string::npos ||
-        lowerEndpoint.find("172.22.") != std::string::npos ||
-        lowerEndpoint.find("172.23.") != std::string::npos ||
-        lowerEndpoint.find("172.24.") != std::string::npos ||
-        lowerEndpoint.find("172.25.") != std::string::npos ||
-        lowerEndpoint.find("172.26.") != std::string::npos ||
-        lowerEndpoint.find("172.27.") != std::string::npos ||
-        lowerEndpoint.find("172.28.") != std::string::npos ||
-        lowerEndpoint.find("172.29.") != std::string::npos ||
-        lowerEndpoint.find("172.30.") != std::string::npos ||
-        lowerEndpoint.find("172.31.") != std::string::npos) {
-        TTSLOG_ERROR("Invalid endpoint - internal network URLs not allowed");
-        return "";
-    }
-    
-    // Only allow HTTPS URLs for security
-    if (lowerEndpoint.find("https://") != 0 && lowerEndpoint.find("http://") != 0) {
-        TTSLOG_ERROR("Invalid endpoint - only http:// and https:// URLs allowed");
+
+    // Validate endpoint to prevent SSRF (RDKEMW-24488)
+    if (!isLocal && !isValidTTSEndpoint(endpoint)) {
+        TTSLOG_ERROR("Invalid or unsafe TTS endpoint: %s", endpoint.c_str());
         return "";
     }
     
@@ -139,6 +135,13 @@ std::string TTSURLConstructer::httpgetURL(TTSConfiguration &config, std::string 
 
 std::string  TTSURLConstructer::httppostURL(TTSConfiguration &config, std::string text, bool isFallback) {
     std::string ttsRequest;
+
+    // Validate endpoint to prevent SSRF (RDKEMW-24488)
+    if (!isValidTTSEndpoint(config.secureEndPoint())) {
+        TTSLOG_ERROR("Invalid or unsafe TTS endpoint: %s", config.secureEndPoint().c_str());
+        return "";
+    }
+
     CURL *curl = curl_easy_init();
 
     if(curl) {
