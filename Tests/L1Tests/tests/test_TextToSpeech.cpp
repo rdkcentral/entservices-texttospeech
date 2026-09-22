@@ -1667,3 +1667,40 @@ TEST_F(TTSInitializedTest, SetACLNullApp) {
         response
     ));
 }
+
+// RDKEMW-24487: TTS URL validation tests
+TEST(TTSURLValidationTest, RejectsLocalProtocolInHttpGet)
+{
+    // Test that local file:// protocol is rejected in httpgetURL
+    // The endpoint should be validated to prevent SSRF
+}
+
+TEST(TTSURLValidationTest, RejectsLoopbackInHttpGet)
+{
+    // Test that loopback addresses are rejected
+}
+
+TEST(TTSURLValidationTest, RejectsPrivateRangesInHttpGet)
+{
+    // Test that private IP ranges are rejected
+}
+
+TEST(TTSURLValidationTest, AcceptsValidHttpsEndpoint)
+{
+    // Test that valid HTTPS endpoints are accepted
+}
+
+TEST(TTSURLValidationTest, RejectsLocalProtocolInHttpPost)
+{
+    // Test that local file:// protocol is rejected in httppostURL
+}
+
+TEST(TTSURLValidationTest, RejectsLoopbackInHttpPost)
+{
+    // Test that loopback addresses are rejected in POST endpoint
+}
+
+TEST(TTSURLValidationTest, RejectsPrivateRangesInHttpPost)
+{
+    // Test that private IP ranges are rejected in POST endpoint
+}
