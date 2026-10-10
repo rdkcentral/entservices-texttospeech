@@ -20,6 +20,7 @@
 #include "TTSURLConstructer.h"
 #include <curl/curl.h>
 #include <unistd.h>
+#include <regex>
 
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -33,6 +34,37 @@ static const std::map<std::string, int> speechRateMap = {
     {"faster", 90},
     {"fastest", 100}
 };
+
+// Validate TTS endpoint URL to prevent SSRF (RDKEMW-24487)
+static bool isValidTTSEndpoint(const std::string& url)
+{
+    if (url.empty())
+        return false;
+
+    // Reject file:// protocol
+    if (url.find("file://") == 0)
+        return false;
+
+    // Reject loopback addresses
+    std::regex loopbackRegex(R"(https?://(127\.|0x7f\.\.\.|localhost|\[::1\]))", std::regex::icase);
+    if (std::regex_search(url, loopbackRegex))
+        return false;
+
+    // Reject private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+    std::regex privateRegex(R"(https?://(10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.))", std::regex::icase);
+    if (std::regex_search(url, privateRegex))
+        return false;
+
+    // Accept HTTPS endpoints
+    if (url.find("https://") == 0)
+        return true;
+
+    // Reject HTTP endpoints (only HTTPS allowed for security)
+    if (url.find("http://") == 0)
+        return false;
+
+    return false;
+}
 
 namespace TTS
 {
@@ -57,8 +89,16 @@ std::string TTSURLConstructer::constructURL(TTSConfiguration &config, std::strin
 
 std::string TTSURLConstructer::httpgetURL(TTSConfiguration &config, std::string text, bool isfallback, bool isLocal) {
     // EndPoint URL
+    std::string endPoint = isLocal ? config.localEndPoint() : (config.isRFCEnabled() ? config.rfcEndPoint() : config.secureEndPoint());
+
+    // Validate endpoint to prevent SSRF (RDKEMW-24487)
+    if (!isLocal && !isValidTTSEndpoint(endPoint)) {
+        TTSLOG_ERROR("Invalid or unsafe TTS endpoint: %s", endPoint.c_str());
+        return "";
+    }
+
     std::string ttsRequest;
-    ttsRequest.append(isLocal ? config.localEndPoint() : (config.isRFCEnabled() ? config.rfcEndPoint() : config.secureEndPoint()));
+    ttsRequest.append(endPoint);
 
     // Voice
     if(!config.voice().empty()) {
@@ -96,6 +136,12 @@ std::string  TTSURLConstructer::httppostURL(TTSConfiguration &config, std::strin
     std::string ttsRequest;
     CURL *curl = curl_easy_init();
 
+    // Validate endpoint to prevent SSRF (RDKEMW-24487)
+    if (!isValidTTSEndpoint(config.secureEndPoint())) {
+        TTSLOG_ERROR("Invalid or unsafe TTS endpoint: %s", config.secureEndPoint().c_str());
+        return "";
+    }
+
     if(curl) {
         CURLcode res;
         struct curl_slist *list = NULL;
@@ -108,7 +154,7 @@ std::string  TTSURLConstructer::httppostURL(TTSConfiguration &config, std::strin
             jsonConfig["input"] = config.getFallbackValue();
         } else {
             jsonConfig["input"] = text;
-        } 
+        }
 
         jsonConfig["language"] = config.language();
         jsonConfig["voice"] = config.voice();
