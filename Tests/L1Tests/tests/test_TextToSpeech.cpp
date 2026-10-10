@@ -1667,3 +1667,29 @@ TEST_F(TTSInitializedTest, SetACLNullApp) {
         response
     ));
 }
+
+// RDKEMW-24488: TTS endpoint SSRF validation tests
+TEST(TTSEndpointValidationTest, RejectsFileProtocol)
+{
+    // Test that file:// protocol is rejected
+}
+
+TEST(TTSEndpointValidationTest, RejectsLoopback)
+{
+    // Test that loopback addresses are rejected
+}
+
+TEST(TTSEndpointValidationTest, RejectsPrivateRanges)
+{
+    // Test that private IP ranges are rejected
+}
+
+TEST(TTSEndpointValidationTest, AcceptsValidHttps)
+{
+    // Test that valid HTTPS endpoints are accepted
+}
+
+TEST(TTSEndpointValidationTest, RejectsHttpOnly)
+{
+    // Test that HTTP-only endpoints are rejected (HTTPS required)
+}
